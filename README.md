@@ -1,20 +1,35 @@
-# Bot-Terabox
+# 📦 Bot-Terabox
 
-Bot de WhatsApp dedicado exclusivamente a la descarga de archivos desde enlaces de **TeraBox**.
+Bot de WhatsApp **dedicado exclusivamente** a la descarga de archivos desde enlaces públicos de **TeraBox**.
 
-## Características
+> **Alcance estricto:** una sola cuenta de TeraBox por instancia. No incluye rotación de cuentas, creación masiva ni pools de sesiones.
 
-- Gestión de **una única sesión** de TeraBox (cookie `NDUS`)
-- Creación semi-automática de cuenta usando correo temporal (Mail.tm)
-- Validación automática de la sesión
-- Comando de descarga `.terabox` con scraping anti-bot y múltiples fallbacks
-- Sistema de alertas al propietario (con control de frecuencia)
-- Soporte de proxies residenciales
-- Técnicas de anti-detección en Playwright y en el scraper
-- Rotación de User-Agents
-- CI con GitHub Actions (tests de comandos, proxies, sesión y flujo de auth de WhatsApp mockeado)
+---
 
-## Instalación
+## ✨ Características
+
+| Área | Descripción |
+|------|-------------|
+| 🔐 Sesión | Gestión de **una única** cookie `NDUS` |
+| 📧 Registro | Creación semi-automática con correo temporal (Mail.tm) |
+| ✅ Validación | Comprobación automática del estado de la sesión |
+| ⬇️ Descarga | Comando `.terabox` con API + scraping y fallbacks |
+| 🔔 Alertas | Notificaciones al propietario (con cooldown anti-spam) |
+| 🌐 Proxies | Soporte de proxies residenciales vía archivo local |
+| 🛡️ Anti-detección | Headers realistas, delays humanos, User-Agents rotativos |
+| 🧪 CI | GitHub Actions: proxies, sesión, comandos y auth WhatsApp mockeado |
+
+---
+
+## 📋 Requisitos
+
+- Node.js 20+ (recomendado 22)
+- Cuenta de WhatsApp para vincular el bot (QR)
+- (Opcional) Proxies residenciales propios
+
+---
+
+## 🚀 Instalación
 
 ```bash
 git clone https://github.com/Gh0stDeveloper/Bot-Terabox.git
@@ -24,9 +39,17 @@ npx playwright install chromium
 cp .env.example .env
 ```
 
-Edite el archivo `.env` y agregue su número de propietario (`OWNER_NUMBER`).
+Edite `.env` y defina **obligatoriamente**:
 
-## Uso
+```env
+OWNER_NUMBER=54911xxxxxxxx
+```
+
+> Use el número en formato internacional **sin** el signo `+`.
+
+---
+
+## ▶️ Uso
 
 ### 1. Iniciar el bot
 
@@ -34,21 +57,25 @@ Edite el archivo `.env` y agregue su número de propietario (`OWNER_NUMBER`).
 npm start
 ```
 
-Escanee el código QR con WhatsApp.
+Escanee el código QR con WhatsApp. La sesión de WhatsApp se guarda en `sessions/auth/`.
 
-### 2. Crear la cuenta de TeraBox (solo una vez)
+### 2. Crear la cuenta de TeraBox *(solo una vez)*
 
 ```
 .teraboxcreate
 ```
 
-Solo el propietario puede ejecutar este comando.
+- **Solo el propietario** puede ejecutarlo.
+- Genera correo temporal, completa el registro y guarda `NDUS` en `sessions/terabox.json`.
+- La primera vez se recomienda dejar el navegador visible (`headless: false`) para verificar el flujo.
 
-### 3. Comprobar estado de la sesión
+### 3. Comprobar el estado de la sesión
 
 ```
 .teraboxsession
 ```
+
+Muestra si la sesión es válida, el email asociado y las fechas de creación / última validación.
 
 ### 4. Descargar un archivo
 
@@ -56,56 +83,89 @@ Solo el propietario puede ejecutar este comando.
 .terabox https://www.terabox.com/s/1AbC123...
 ```
 
-## Tests locales
+Alias disponible: `.tb`
+
+Si la sesión ha expirado, el bot avisará y el propietario deberá ejecutar `.teraboxcreate` de nuevo.
+
+---
+
+## 🧪 Tests locales
 
 ```bash
 npm test
 ```
 
-O por separado:
+| Script | Qué valida |
+|--------|------------|
+| `npm run test:proxy` | Lectura de `sessions/proxies.txt` |
+| `npm run test:session` | Guardado / carga de sesión y header `Cookie` |
+| `npm run test:commands` | Registro de comandos y `extractSurl` |
+| `npm run test:wa` | Flujo de auth Baileys **sin número real** |
 
-```bash
-npm run test:proxy      # Lectura de sessions/proxies.txt
-npm run test:session    # Guardado/carga de sesión TeraBox
-npm run test:commands   # Registro de comandos y extractSurl
-npm run test:wa         # Flujo de auth WhatsApp (sin número real)
-```
+---
 
-## CI (GitHub Actions)
+## ⚙️ CI — GitHub Actions
 
-En cada push o pull request a `main` se ejecuta:
+En cada **push** o **pull request** a `main` se ejecuta el workflow **CI**, que:
 
-1. Instalación de dependencias y Chromium
-2. Verificación de archivos principales
-3. Test de carga del archivo de proxies
-4. Test de sesión (save/load/cookie)
-5. Test de comandos (`.terabox`, `.teraboxsession`, `.teraboxcreate`)
-6. Test del flujo de vinculación WhatsApp **mockeado** (sin número real ni QR)
+1. Instala dependencias y Chromium (Playwright)
+2. Verifica la existencia de los archivos principales
+3. Ejecuta los tests de proxies, sesión y comandos
+4. Valida el flujo de autenticación de WhatsApp de forma **mockeada**
 
-> **Nota:** No es posible completar el emparejamiento real de WhatsApp dentro de GitHub Actions, porque Baileys requiere escanear un código QR con un teléfono. El CI valida que el código de autenticación y la estructura de conexión funcionan correctamente.
+> ⚠️ **Limitación:** no es posible vincular un número real de WhatsApp dentro de Actions. Baileys requiere escanear un QR con un teléfono. El CI solo comprueba que el código de auth state y la estructura de conexión son correctos.
 
-## Proxies
+---
 
-Coloque sus proxies residenciales (uno por línea) en:
+## 🌐 Proxies
 
-```
-sessions/proxies.txt
-```
+Archivo: `sessions/proxies.txt` (un proxy por línea).
 
-Formato:
-```
+```text
+# Comentarios permitidos
 http://usuario:contraseña@ip:puerto
 http://ip:puerto
 ```
 
-El CI comprueba que el módulo lee correctamente este archivo.
+- Use **proxies residenciales de calidad**. Las listas públicas gratuitas no son recomendables.
+- El módulo elige uno al azar en el registro semi-automático.
+- El CI comprueba que la lectura del archivo funciona correctamente.
 
-## Notas importantes
+---
 
-- Una sola cuenta de TeraBox.
-- Sin rotación ni creación masiva de cuentas.
-- Cuando la sesión expire, use `.teraboxcreate` de forma controlada.
+## 📁 Estructura del proyecto
 
-## Licencia
+```text
+src/
+├── index.ts                      # Entrada del bot (Baileys)
+├── commands/
+│   ├── terabox.ts                # .terabox / .tb
+│   └── terabox-session.ts        # .teraboxsession / .teraboxcreate
+└── services/
+    ├── alerts.ts                 # Alertas al propietario
+    ├── temp-email.ts             # Mail.tm
+    ├── terabox-session.ts        # Persistencia y validación NDUS
+    ├── terabox-register.ts       # Registro semi-automático
+    ├── terabox-scraper.ts        # Extracción de enlaces (API + HTML)
+    ├── proxy-manager.ts          # Lectura de proxies
+    └── user-agents.ts            # Rotación de User-Agents
+tests/                            # Tests ejecutados en CI y en local
+.github/workflows/ci.yml          # Pipeline de integración continua
+sessions/                         # Auth WhatsApp, terabox.json, proxies.txt
+```
 
-Uso personal.
+---
+
+## ⚠️ Reglas de uso (estrictas)
+
+1. **Una sola cuenta** de TeraBox por despliegue del bot.
+2. **No** hay rotación ni creación masiva de cuentas.
+3. Cuando la sesión expire, cree una nueva de forma **manual** con `.teraboxcreate`.
+4. No abuse de la frecuencia de descargas; un uso moderado reduce el riesgo de bloqueo.
+5. Los selectores de la web de TeraBox pueden cambiar; si el registro falla, habrá que revisarlos.
+
+---
+
+## 📄 Licencia
+
+Uso **personal**. No se garantiza soporte ni compatibilidad continua con cambios de la API o la interfaz de TeraBox.
