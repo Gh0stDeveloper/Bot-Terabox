@@ -7,7 +7,12 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
-    "create-account": "tsx src/scripts/create-account.ts"
+    "create-account": "tsx src/scripts/create-account.ts",
+    "test": "tsx tests/proxy-manager.test.ts && tsx tests/session.test.ts && tsx tests/commands.test.ts && tsx tests/whatsapp-connection.mock.test.ts",
+    "test:proxy": "tsx tests/proxy-manager.test.ts",
+    "test:session": "tsx tests/session.test.ts",
+    "test:commands": "tsx tests/commands.test.ts",
+    "test:wa": "tsx tests/whatsapp-connection.mock.test.ts"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.16",

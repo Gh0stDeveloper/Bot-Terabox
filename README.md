@@ -12,7 +12,7 @@ Bot de WhatsApp dedicado exclusivamente a la descarga de archivos desde enlaces 
 - Soporte de proxies residenciales
 - Técnicas de anti-detección en Playwright y en el scraper
 - Rotación de User-Agents
-- CI con GitHub Actions
+- CI con GitHub Actions (tests de comandos, proxies, sesión y flujo de auth de WhatsApp mockeado)
 
 ## Instalación
 
@@ -42,7 +42,7 @@ Escanee el código QR con WhatsApp.
 .teraboxcreate
 ```
 
-Solo el propietario puede ejecutar este comando. Genera un correo temporal, completa el registro y guarda la cookie `NDUS`.
+Solo el propietario puede ejecutar este comando.
 
 ### 3. Comprobar estado de la sesión
 
@@ -56,54 +56,33 @@ Solo el propietario puede ejecutar este comando. Genera un correo temporal, comp
 .terabox https://www.terabox.com/s/1AbC123...
 ```
 
-Si la sesión ha expirado, el bot avisará y el propietario deberá ejecutar `.teraboxcreate` de nuevo.
+## Tests locales
 
-## Sistema de alertas
+```bash
+npm test
+```
 
-El bot notifica automáticamente al propietario cuando:
+O por separado:
 
-- La sesión de TeraBox expira
-- Se crea una cuenta correctamente
-- Falla el registro de una cuenta
-- Falla una descarga
-
-Las alertas tienen un cooldown de 1 minuto para evitar spam.
-
-## Anti-bot en el scraper
-
-El módulo de extracción de archivos utiliza:
-
-- Headers realistas (sec-ch-ua, sec-fetch-*, Accept-Language, etc.)
-- User-Agent rotativo
-- Delays aleatorios entre peticiones
-- Tres niveles de obtención del enlace (API → API alternativa → scraping HTML)
+```bash
+npm run test:proxy      # Lectura de sessions/proxies.txt
+npm run test:session    # Guardado/carga de sesión TeraBox
+npm run test:commands   # Registro de comandos y extractSurl
+npm run test:wa         # Flujo de auth WhatsApp (sin número real)
+```
 
 ## CI (GitHub Actions)
 
-En cada push o pull request a `main` se ejecuta un workflow que:
+En cada push o pull request a `main` se ejecuta:
 
-- Instala dependencias
-- Verifica que existan los archivos principales
-- Comprueba imports básicos
-- Instala Chromium de Playwright
+1. Instalación de dependencias y Chromium
+2. Verificación de archivos principales
+3. Test de carga del archivo de proxies
+4. Test de sesión (save/load/cookie)
+5. Test de comandos (`.terabox`, `.teraboxsession`, `.teraboxcreate`)
+6. Test del flujo de vinculación WhatsApp **mockeado** (sin número real ni QR)
 
-## Estructura del proyecto
-
-```
-src/
-├── index.ts
-├── commands/
-│   ├── terabox.ts
-│   └── terabox-session.ts
-└── services/
-    ├── alerts.ts
-    ├── temp-email.ts
-    ├── terabox-session.ts
-    ├── terabox-register.ts
-    ├── terabox-scraper.ts
-    ├── proxy-manager.ts
-    └── user-agents.ts
-```
+> **Nota:** No es posible completar el emparejamiento real de WhatsApp dentro de GitHub Actions, porque Baileys requiere escanear un código QR con un teléfono. El CI valida que el código de autenticación y la estructura de conexión funcionan correctamente.
 
 ## Proxies
 
@@ -113,12 +92,19 @@ Coloque sus proxies residenciales (uno por línea) en:
 sessions/proxies.txt
 ```
 
+Formato:
+```
+http://usuario:contraseña@ip:puerto
+http://ip:puerto
+```
+
+El CI comprueba que el módulo lee correctamente este archivo.
+
 ## Notas importantes
 
-- Este bot está diseñado para **una sola cuenta** de TeraBox.
-- No incluye rotación ni creación masiva de cuentas.
-- Cuando la sesión expire, cree una nueva de forma controlada con `.teraboxcreate`.
-- Use proxies residenciales de calidad para mayor estabilidad.
+- Una sola cuenta de TeraBox.
+- Sin rotación ni creación masiva de cuentas.
+- Cuando la sesión expire, use `.teraboxcreate` de forma controlada.
 
 ## Licencia
 
