@@ -11,6 +11,7 @@ import fs from 'fs-extra';
 
 import { teraboxDownloadCommand } from './commands/terabox.js';
 import { teraboxSessionCommands } from './commands/terabox-session.js';
+import { initAlerts } from './services/alerts.js';
 
 const commands = [teraboxDownloadCommand, teraboxSessionCommands];
 
@@ -42,6 +43,13 @@ async function startBot() {
       if (shouldReconnect) startBot();
     } else if (connection === 'open') {
       console.log('Bot conectado correctamente');
+
+      // Inicializar sistema de alertas
+      const ownerNumber = process.env.OWNER_NUMBER || '';
+      if (ownerNumber) {
+        initAlerts(sock, ownerNumber);
+        console.log('Sistema de alertas inicializado para el propietario');
+      }
     }
   });
 
@@ -90,7 +98,6 @@ async function startBot() {
   });
 }
 
-// Crear carpeta de sesiones si no existe
 fs.ensureDirSync(path.join(process.cwd(), 'sessions'));
 
 startBot().catch(console.error);

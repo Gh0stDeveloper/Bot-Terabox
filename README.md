@@ -7,7 +7,8 @@ Bot de WhatsApp dedicado exclusivamente a la descarga de archivos desde enlaces 
 - Gestión de una única sesión de TeraBox (cookie `NDUS`)
 - Creación semi-automática de cuenta usando correo temporal (Mail.tm)
 - Validación automática de la sesión
-- Comando de descarga `.terabox`
+- Comando de descarga `.terabox` con scraping de respaldo
+- Sistema de alertas al propietario (sesión expirada, errores de descarga, etc.)
 - Soporte de proxies residenciales
 - Técnicas básicas de anti-detección en Playwright
 - Rotación de User-Agents
@@ -22,7 +23,7 @@ npx playwright install chromium
 cp .env.example .env
 ```
 
-Edite el archivo `.env` y agregue su número de propietario.
+Edite el archivo `.env` y agregue su número de propietario (`OWNER_NUMBER`).
 
 ## Uso
 
@@ -40,7 +41,7 @@ Escanee el código QR con WhatsApp.
 .teraboxcreate
 ```
 
-El bot generará un correo temporal, completará el registro y guardará la cookie `NDUS` en `sessions/terabox.json`.
+El bot generará un correo temporal, completará el registro y guardará la cookie `NDUS`.
 
 ### 3. Comprobar estado de la sesión
 
@@ -54,20 +55,31 @@ El bot generará un correo temporal, completará el registro y guardará la cook
 .terabox https://www.terabox.com/s/1AbC123...
 ```
 
+## Sistema de alertas
+
+El bot notifica automáticamente al propietario cuando:
+
+- La sesión de TeraBox expira
+- Se crea una cuenta correctamente
+- Falla el registro de una cuenta
+- Falla una descarga
+
 ## Estructura del proyecto
 
 ```
 src/
-├── index.ts                 # Punto de entrada del bot
+├── index.ts
 ├── commands/
-│   ├── terabox.ts           # Comando de descarga
-│   └── terabox-session.ts   # Comandos de sesión y creación
+│   ├── terabox.ts
+│   └── terabox-session.ts
 └── services/
-    ├── temp-email.ts        # Correo temporal (Mail.tm)
-    ├── terabox-session.ts   # Gestión y validación de sesión
-    ├── terabox-register.ts  # Registro semi-automático
-    ├── proxy-manager.ts     # Rotación de proxies
-    └── user-agents.ts       # Rotación de User-Agents
+    ├── alerts.ts              # Sistema de alertas al propietario
+    ├── temp-email.ts
+    ├── terabox-session.ts
+    ├── terabox-register.ts
+    ├── terabox-scraper.ts     # Extracción de enlaces (API + scraping)
+    ├── proxy-manager.ts
+    └── user-agents.ts
 ```
 
 ## Proxies
@@ -78,18 +90,12 @@ Coloque sus proxies residenciales (uno por línea) en:
 sessions/proxies.txt
 ```
 
-Formato aceptado:
-```
-http://usuario:contraseña@ip:puerto
-http://ip:puerto
-```
-
 ## Notas importantes
 
 - Este bot está diseñado para **una sola cuenta** de TeraBox.
 - No se recomienda la creación masiva de cuentas.
 - Use proxies residenciales de calidad para mayor estabilidad.
-- La primera ejecución de `.teraboxcreate` se recomienda con el navegador visible (`headless: false`).
+- La primera ejecución de `.teraboxcreate` se recomienda con el navegador visible.
 
 ## Licencia
 

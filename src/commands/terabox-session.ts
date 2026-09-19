@@ -1,5 +1,6 @@
 import { loadSession, isSessionValid, saveSession } from '../services/terabox-session.js';
 import { createOneTeraboxAccount } from '../services/terabox-register.js';
+import { alertAccountCreated, alertRegistrationFailed } from '../services/alerts.js';
 
 export const teraboxSessionCommands = {
   command: ['teraboxsession', 'tbsession', 'teraboxcreate'],
@@ -11,13 +12,20 @@ export const teraboxSessionCommands = {
     try {
       if (command === 'teraboxcreate') {
         await m.reply('⏳ Iniciando creación de una cuenta de TeraBox...\nEsto puede tardar 1-2 minutos.');
-        const session = await createOneTeraboxAccount();
-        return m.reply(
-          `✅ Cuenta creada correctamente.\n\n` +
-            `• Email: ${session.email}\n` +
-            `• NDUS: ${session.ndus.slice(0, 22)}...\n` +
-            `• Guardada en sessions/terabox.json`
-        );
+
+        try {
+          const session = await createOneTeraboxAccount();
+          await alertAccountCreated(session.email || 'desconocido');
+          return m.reply(
+            `✅ Cuenta creada correctamente.\n\n` +
+              `• Email: ${session.email}\n` +
+              `• NDUS: ${session.ndus.slice(0, 22)}...\n` +
+              `• Guardada en sessions/terabox.json`
+          );
+        } catch (regErr: any) {
+          await alertRegistrationFailed(regErr.message || 'Error desconocido');
+          throw regErr;
+        }
       }
 
       const session = await loadSession();
