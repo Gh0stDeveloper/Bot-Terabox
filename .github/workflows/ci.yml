@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check (si existe tsconfig)
+        run: |
+          if [ -f tsconfig.json ]; then
+            npx tsc --noEmit
+          else
+            echo "No tsconfig.json – omitiendo chequeo estricto de TypeScript"
+          fi
+
+      - name: Verify main files exist
+        run: |
+          test -f src/index.ts
+          test -f src/commands/terabox.ts
+          test -f src/commands/terabox-session.ts
+          test -f src/services/terabox-session.ts
+          test -f src/services/terabox-register.ts
+          test -f src/services/terabox-scraper.ts
+          test -f src/services/temp-email.ts
+          test -f src/services/alerts.ts
+          test -f src/services/proxy-manager.ts
+          test -f src/services/user-agents.ts
+          echo "Todos los archivos principales existen"
+
+      - name: Syntax check with Node
+        run: |
+          npx tsx --eval "console.log('tsx OK')"
+
+      - name: Install Playwright browsers (chromium only)
+        run: npx playwright install chromium --with-deps
+
+      - name: Basic import check
+        run: |
+          npx tsx -e "
+            import { extractSurl } from './src/services/terabox-scraper.ts';
+            import { getRandomUserAgent } from './src/services/user-agents.ts';
+            console.log('extractSurl test:', extractSurl('https://www.terabox.com/s/1AbC123'));
+            console.log('UA sample:', getRandomUserAgent().slice(0, 40) + '...');
+            console.log('Imports OK');
+          "

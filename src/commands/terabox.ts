@@ -16,14 +16,17 @@ export const teraboxDownloadCommand = {
     try {
       const session = await loadSession();
       if (!session) {
-        return m.reply('No hay sesión de TeraBox. Use *.teraboxcreate* primero.');
+        return m.reply(
+          'No hay sesión de TeraBox.\nUse *.teraboxcreate* para crear una cuenta (solo el propietario).'
+        );
       }
 
       const valid = await isSessionValid(session);
       if (!valid) {
         await alertSessionExpired();
         return m.reply(
-          'La sesión de TeraBox ha expirado.\nUse *.teraboxcreate* para generar una nueva cuenta.'
+          '⚠️ La sesión de TeraBox ha expirado.\n\n' +
+            'El propietario debe usar *.teraboxcreate* para generar una nueva cuenta.'
         );
       }
 

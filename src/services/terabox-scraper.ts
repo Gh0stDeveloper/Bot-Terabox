@@ -1,5 +1,6 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { getCookieHeader, TeraboxSession } from './terabox-session.js';
+import { getRandomUserAgent } from './user-agents.js';
 
 export interface TeraboxFileInfo {
   filename: string;
@@ -9,15 +10,35 @@ export interface TeraboxFileInfo {
   isdir?: number;
 }
 
+function humanDelay(min = 400, max = 1200) {
+  return new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
+}
+
+function buildHeaders(session: TeraboxSession, extra: Record<string, string> = {}) {
+  const ua = getRandomUserAgent();
+  return {
+    'User-Agent': ua,
+    Cookie: getCookieHeader(session),
+    Referer: 'https://www.terabox.com/',
+    Origin: 'https://www.terabox.com',
+    Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    ...extra,
+  };
+}
+
 /**
  * Extrae el surl de un enlace de TeraBox.
  */
 export function extractSurl(url: string): string | null {
   try {
-    // Formatos comunes:
-    // https://www.terabox.com/s/1AbC...
-    // https://1024terabox.com/s/1AbC...
-    // https://teraboxapp.com/s/1AbC...
     const match = url.match(/\/s\/([a-zA-Z0-9_-]+)/);
     return match ? match[1] : null;
   } catch {
@@ -26,20 +47,20 @@ export function extractSurl(url: string): string | null {
 }
 
 /**
- * Obtiene información del archivo usando la API oficial + fallback de scraping.
+ * Obtiene información del archivo con técnicas anti-bot:
+ * - Headers realistas + User-Agent rotativo
+ * - Delays humanos entre peticiones
+ * - Múltiples endpoints de respaldo
+ * - Scraping HTML como último recurso
  */
 export async function getFileInfo(
   surl: string,
   session: TeraboxSession
 ): Promise<TeraboxFileInfo | null> {
-  const cookie = getCookieHeader(session);
-  const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    Cookie: cookie,
-    Referer: 'https://www.terabox.com/',
-    Accept: 'application/json, text/plain, */*',
-  };
+  const headers = buildHeaders(session);
+
+  // Pequeña pausa inicial (simula comportamiento humano)
+  await humanDelay(300, 900);
 
   // --- Método 1: API shorturlinfo ---
   try {
@@ -51,6 +72,7 @@ export async function getFileInfo(
       },
       headers,
       timeout: 15000,
+      validateStatus: (s) => s < 500,
     });
 
     const file = res.data?.list?.[0];
@@ -67,6 +89,8 @@ export async function getFileInfo(
     console.log('Método shorturlinfo falló, intentando fallback...');
   }
 
+  await humanDelay(500, 1400);
+
   // --- Método 2: share/list ---
   try {
     const res = await axios.get('https://www.terabox.com/share/list', {
@@ -77,8 +101,9 @@ export async function getFileInfo(
         page: 1,
         num: 50,
       },
-      headers,
+      headers: buildHeaders(session), // nuevo UA
       timeout: 15000,
+      validateStatus: (s) => s < 500,
     });
 
     const file = res.data?.list?.[0];
@@ -95,29 +120,50 @@ export async function getFileInfo(
     console.log('Método share/list falló');
   }
 
+  await humanDelay(600, 1500);
+
   // --- Método 3: Scraping de la página de share (último recurso) ---
   try {
     const pageRes = await axios.get(`https://www.terabox.com/s/${surl}`, {
       headers: {
-        ...headers,
-        Accept: 'text/html,application/xhtml+xml',
+        ...buildHeaders(session, {
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'sec-fetch-dest': 'document',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'none',
+          'Upgrade-Insecure-Requests': '1',
+        }),
       },
       timeout: 20000,
+      validateStatus: (s) => s < 500,
     });
 
     const html = pageRes.data as string;
 
-    // Buscar dlink o datos embebidos en scripts
-    const dlinkMatch = html.match(/"dlink"\s*:\s*"(https?:\\/\\/[^"\\]+)/);
+    // Buscar dlink embebido en JSON dentro de scripts
+    const dlinkMatch =
+      html.match(/"dlink"\s*:\s*"(https?:\\/\\/[^"\\]+)/) ||
+      html.match(/"dlink"\s*:\s*"(https?:\/\/[^"\\]+)/);
+
     if (dlinkMatch) {
       const dlink = dlinkMatch[1].replace(/\\\//g, '/');
       const nameMatch = html.match(/"server_filename"\s*:\s*"([^"]+)"/);
-      const sizeMatch = html.match(/"size"\s*:\s*(\d+)/);
+      const sizeMatch = html.match(/"size"\s*:\s*"?(\d+)"?/);
 
       return {
         filename: nameMatch ? nameMatch[1] : 'archivo_terabox',
         size: sizeMatch ? Number(sizeMatch[1]) : 0,
         dlink,
+      };
+    }
+
+    // Búsqueda alternativa de URLs de descarga
+    const urlMatch = html.match(/(https?:\/\/[^"'\s]+\.(?:terabox|dubox| freeterabox)[^"'\s]*download[^"'\s]*)/i);
+    if (urlMatch) {
+      return {
+        filename: 'archivo_terabox',
+        size: 0,
+        dlink: urlMatch[1],
       };
     }
   } catch (err) {
@@ -128,13 +174,12 @@ export async function getFileInfo(
 }
 
 /**
- * Intenta obtener un enlace de descarga más limpio (a veces el dlink requiere headers extra).
+ * Resuelve / limpia el enlace directo.
+ * Se puede ampliar en el futuro si TeraBox exige más pasos.
  */
 export async function resolveDirectLink(
   dlink: string,
-  session: TeraboxSession
+  _session: TeraboxSession
 ): Promise<string> {
-  // En muchos casos el dlink ya es usable.
-  // Si en el futuro TeraBox exige más pasos, aquí se puede ampliar.
   return dlink;
 }
