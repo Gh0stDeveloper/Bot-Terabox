@@ -34,9 +34,6 @@ function buildHeaders(session: TeraboxSession, extra: Record<string, string> = {
   };
 }
 
-/**
- * Extrae el surl de un enlace de TeraBox.
- */
 export function extractSurl(url: string): string | null {
   try {
     const match = url.match(/\/s\/([a-zA-Z0-9_-]+)/);
@@ -46,9 +43,32 @@ export function extractSurl(url: string): string | null {
   }
 }
 
-/**
- * Obtiene información del archivo con técnicas anti-bot.
- */
+function extractDlinkFromHtml(html: string): string | null {
+  // Buscar "dlink":"https://..." o "dlink":"https:\/\/..."
+  const marker = '"dlink"';
+  let idx = html.indexOf(marker);
+  while (idx !== -1) {
+    const slice = html.slice(idx, idx + 500);
+    const m = slice.match(/"dlink"\s*:\s*"([^"]+)"/);
+    if (m && m[1]) {
+      const raw = m[1].replace(/\\\//g, '/');
+      if (raw.startsWith('http')) return raw;
+    }
+    idx = html.indexOf(marker, idx + 1);
+  }
+  return null;
+}
+
+function extractFilenameFromHtml(html: string): string {
+  const m = html.match(/"server_filename"\s*:\s*"([^"]+)"/);
+  return m ? m[1] : 'archivo_terabox';
+}
+
+function extractSizeFromHtml(html: string): number {
+  const m = html.match(/"size"\s*:\s*"?(\d+)"?/);
+  return m ? Number(m[1]) : 0;
+}
+
 export async function getFileInfo(
   surl: string,
   session: TeraboxSession
@@ -57,14 +77,9 @@ export async function getFileInfo(
 
   await humanDelay(300, 900);
 
-  // Método 1: API shorturlinfo
   try {
     const res = await axios.get('https://www.terabox.com/api/shorturlinfo', {
-      params: {
-        app_id: '250528',
-        shorturl: surl,
-        root: 1,
-      },
+      params: { app_id: '250528', shorturl: surl, root: 1 },
       headers,
       timeout: 15000,
       validateStatus: (s) => s < 500,
@@ -86,16 +101,9 @@ export async function getFileInfo(
 
   await humanDelay(500, 1400);
 
-  // Método 2: share/list
   try {
     const res = await axios.get('https://www.terabox.com/share/list', {
-      params: {
-        app_id: '250528',
-        shorturl: surl,
-        root: 1,
-        page: 1,
-        num: 50,
-      },
+      params: { app_id: '250528', shorturl: surl, root: 1, page: 1, num: 50 },
       headers: buildHeaders(session),
       timeout: 15000,
       validateStatus: (s) => s < 500,
@@ -117,9 +125,8 @@ export async function getFileInfo(
 
   await humanDelay(600, 1500);
 
-  // Método 3: Scraping HTML
   try {
-    const pageRes = await axios.get(`https://www.terabox.com/s/${surl}`, {
+    const pageRes = await axios.get('https://www.terabox.com/s/' + surl, {
       headers: {
         ...buildHeaders(session, {
           Accept:
@@ -135,35 +142,12 @@ export async function getFileInfo(
     });
 
     const html = String(pageRes.data);
-
-    // dlink en JSON escapado (\/)
-    let dlinkMatch = html.match(/"dlink"\s*:\s*"(https?:\\/\\/[^"\\]+)"/);
-    if (!dlinkMatch) {
-      // dlink con barras normales
-      dlinkMatch = html.match(/"dlink"\s*:\s*"(https?:\/\/[^"\\]+)"/);
-    }
-
-    if (dlinkMatch) {
-      const dlink = dlinkMatch[1].replace(/\\\//g, '/');
-      const nameMatch = html.match(/"server_filename"\s*:\s*"([^"]+)"/);
-      const sizeMatch = html.match(/"size"\s*:\s*"?(\d+)"?/);
-
+    const dlink = extractDlinkFromHtml(html);
+    if (dlink) {
       return {
-        filename: nameMatch ? nameMatch[1] : 'archivo_terabox',
-        size: sizeMatch ? Number(sizeMatch[1]) : 0,
+        filename: extractFilenameFromHtml(html),
+        size: extractSizeFromHtml(html),
         dlink,
-      };
-    }
-
-    // Búsqueda alternativa de URL de descarga
-    const urlMatch = html.match(
-      /(https?:\/\/[^\s"']+(?:terabox|dubox|freeterabox)[^\s"']*download[^\s"']*)/i
-    );
-    if (urlMatch) {
-      return {
-        filename: 'archivo_terabox',
-        size: 0,
-        dlink: urlMatch[1],
       };
     }
   } catch {
