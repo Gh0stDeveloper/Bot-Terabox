@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { getCookieHeader, TeraboxSession } from './terabox-session.js';
 import { getRandomUserAgent } from './user-agents.js';
 
@@ -11,7 +11,7 @@ export interface TeraboxFileInfo {
 }
 
 function humanDelay(min = 400, max = 1200) {
-  return new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
+  return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
 function buildHeaders(session: TeraboxSession, extra: Record<string, string> = {}) {
@@ -47,11 +47,7 @@ export function extractSurl(url: string): string | null {
 }
 
 /**
- * Obtiene información del archivo con técnicas anti-bot:
- * - Headers realistas + User-Agent rotativo
- * - Delays humanos entre peticiones
- * - Múltiples endpoints de respaldo
- * - Scraping HTML como último recurso
+ * Obtiene información del archivo con técnicas anti-bot.
  */
 export async function getFileInfo(
   surl: string,
@@ -59,10 +55,9 @@ export async function getFileInfo(
 ): Promise<TeraboxFileInfo | null> {
   const headers = buildHeaders(session);
 
-  // Pequeña pausa inicial (simula comportamiento humano)
   await humanDelay(300, 900);
 
-  // --- Método 1: API shorturlinfo ---
+  // Método 1: API shorturlinfo
   try {
     const res = await axios.get('https://www.terabox.com/api/shorturlinfo', {
       params: {
@@ -85,13 +80,13 @@ export async function getFileInfo(
         isdir: file.isdir,
       };
     }
-  } catch (err) {
+  } catch {
     console.log('Método shorturlinfo falló, intentando fallback...');
   }
 
   await humanDelay(500, 1400);
 
-  // --- Método 2: share/list ---
+  // Método 2: share/list
   try {
     const res = await axios.get('https://www.terabox.com/share/list', {
       params: {
@@ -101,7 +96,7 @@ export async function getFileInfo(
         page: 1,
         num: 50,
       },
-      headers: buildHeaders(session), // nuevo UA
+      headers: buildHeaders(session),
       timeout: 15000,
       validateStatus: (s) => s < 500,
     });
@@ -116,18 +111,19 @@ export async function getFileInfo(
         isdir: file.isdir,
       };
     }
-  } catch (err) {
+  } catch {
     console.log('Método share/list falló');
   }
 
   await humanDelay(600, 1500);
 
-  // --- Método 3: Scraping de la página de share (último recurso) ---
+  // Método 3: Scraping HTML
   try {
     const pageRes = await axios.get(`https://www.terabox.com/s/${surl}`, {
       headers: {
         ...buildHeaders(session, {
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'sec-fetch-dest': 'document',
           'sec-fetch-mode': 'navigate',
           'sec-fetch-site': 'none',
@@ -138,12 +134,14 @@ export async function getFileInfo(
       validateStatus: (s) => s < 500,
     });
 
-    const html = pageRes.data as string;
+    const html = String(pageRes.data);
 
-    // Buscar dlink embebido en JSON dentro de scripts
-    const dlinkMatch =
-      html.match(/"dlink"\s*:\s*"(https?:\\/\\/[^"\\]+)/) ||
-      html.match(/"dlink"\s*:\s*"(https?:\/\/[^"\\]+)/);
+    // dlink en JSON escapado (\/)
+    let dlinkMatch = html.match(/"dlink"\s*:\s*"(https?:\\/\\/[^"\\]+)"/);
+    if (!dlinkMatch) {
+      // dlink con barras normales
+      dlinkMatch = html.match(/"dlink"\s*:\s*"(https?:\/\/[^"\\]+)"/);
+    }
 
     if (dlinkMatch) {
       const dlink = dlinkMatch[1].replace(/\\\//g, '/');
@@ -157,8 +155,10 @@ export async function getFileInfo(
       };
     }
 
-    // Búsqueda alternativa de URLs de descarga
-    const urlMatch = html.match(/(https?:\/\/[^"'\s]+\.(?:terabox|dubox| freeterabox)[^"'\s]*download[^"'\s]*)/i);
+    // Búsqueda alternativa de URL de descarga
+    const urlMatch = html.match(
+      /(https?:\/\/[^\s"']+(?:terabox|dubox|freeterabox)[^\s"']*download[^\s"']*)/i
+    );
     if (urlMatch) {
       return {
         filename: 'archivo_terabox',
@@ -166,17 +166,13 @@ export async function getFileInfo(
         dlink: urlMatch[1],
       };
     }
-  } catch (err) {
+  } catch {
     console.log('Scraping de página falló');
   }
 
   return null;
 }
 
-/**
- * Resuelve / limpia el enlace directo.
- * Se puede ampliar en el futuro si TeraBox exige más pasos.
- */
 export async function resolveDirectLink(
   dlink: string,
   _session: TeraboxSession
