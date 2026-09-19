@@ -1,0 +1,26 @@
+{
+  "name": "bot-terabox",
+  "version": "1.0.0",
+  "description": "Bot de WhatsApp dedicado a descargas de TeraBox con gestión de sesión automática",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "create-account": "tsx src/scripts/create-account.ts"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "axios": "^1.7.9",
+    "fs-extra": "^11.2.0",
+    "playwright": "^1.49.1",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.2",
+    "@types/fs-extra": "^11.0.4"
+  }
+}

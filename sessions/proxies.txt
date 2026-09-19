@@ -1,0 +1,4 @@
+# Coloque aquí sus proxies residenciales (uno por línea)
+# Ejemplo:
+# http://usuario:contraseña@ip:puerto
+# http://ip:puerto
